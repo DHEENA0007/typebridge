@@ -1,0 +1,51 @@
+{
+  "name": "typebridge",
+  "version": "0.1.0",
+  "description": "Universal zero-overhead schema compiler. Seamlessly synchronize types across TypeScript, Python, Rust, Go, and JSON Schema.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "typebridge": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "node dist/tests/compiler.test.js",
+    "lint": "tsc --noEmit",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "typebridge",
+    "typescript",
+    "python",
+    "rust",
+    "go",
+    "pydantic",
+    "zod",
+    "codegen",
+    "schema-generator",
+    "json-schema",
+    "mcp",
+    "types",
+    "developer-tools"
+  ],
+  "author": "TypeBridge Contributors",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/typebridge/typebridge"
+  },
+  "bugs": {
+    "url": "https://github.com/typebridge/typebridge/issues"
+  },
+  "homepage": "https://github.com/typebridge/typebridge#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "typescript": "^5.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7"
+  }
+}

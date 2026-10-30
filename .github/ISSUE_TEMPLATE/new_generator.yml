@@ -1,0 +1,30 @@
+name: 🌐 New Language or Framework Generator Proposal
+description: Propose or claim building a new generator for TypeBridge
+labels: ["enhancement", "generator", "help-wanted", "good-first-issue"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Awesome! Adding a new generator to TypeBridge is self-contained and modular.
+  - type: input
+    id: target_language
+    attributes:
+      label: Target Language or Framework
+      description: Which language or framework do you want to generate code for?
+      placeholder: e.g., Swift, Kotlin, C#, Dart, Prisma, GraphQL
+    validations:
+      required: true
+  - type: textarea
+    id: sample_output
+    attributes:
+      label: Sample Expected Output
+      description: Provide an example of what the generated code should look like for a simple User struct.
+      render: markdown
+    validations:
+      required: true
+  - type: checkboxes
+    id: will_implement
+    attributes:
+      label: Implementation
+      options:
+        - label: I would like to implement this generator myself! (We will assign it to you)

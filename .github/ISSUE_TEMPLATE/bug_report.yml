@@ -1,0 +1,36 @@
+name: 🐛 Bug Report
+description: Create a report to help us improve TypeBridge
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below.
+  - type: input
+    id: version
+    attributes:
+      label: TypeBridge Version
+      description: What version of TypeBridge are you running? (Run `typebridge --version`)
+      placeholder: e.g., 0.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: schema
+    attributes:
+      label: Minimal Input Schema
+      description: Provide the minimal input TypeScript or JSON Schema that triggers the issue.
+      render: typescript
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs Actual Generated Output
+      description: What code should have been generated, and what was actually output?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any other context (OS, Node version, target language version).
