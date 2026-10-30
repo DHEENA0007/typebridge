@@ -33,12 +33,12 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/typebridge/typebridge"
+    "url": "https://github.com/DHEENA0007/typebridge"
   },
   "bugs": {
-    "url": "https://github.com/typebridge/typebridge/issues"
+    "url": "https://github.com/DHEENA0007/typebridge/issues"
   },
-  "homepage": "https://github.com/typebridge/typebridge#readme",
+  "homepage": "https://github.com/DHEENA0007/typebridge#readme",
   "engines": {
     "node": ">=18.0.0"
   },

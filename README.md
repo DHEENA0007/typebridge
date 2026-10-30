@@ -4,8 +4,8 @@
 
 **Universal, zero-overhead schema compiler. Seamlessly synchronize data types across TypeScript, Python, Rust, Go, and JSON Schema.**
 
-[![CI](https://github.com/typebridge/typebridge/actions/workflows/ci.yml/badge.svg)](https://github.com/typebridge/typebridge/actions/workflows/ci.yml)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/typebridge/typebridge/badge)](https://securityscorecards.dev/viewer/?url=github.com/typebridge/typebridge)
+[![CI](https://github.com/DHEENA0007/typebridge/actions/workflows/ci.yml/badge.svg)](https://github.com/DHEENA0007/typebridge/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/DHEENA0007/typebridge/badge)](https://securityscorecards.dev/viewer/?url=github.com/DHEENA0007/typebridge)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![npm version](https://img.shields.io/npm/v/typebridge.svg)](https://www.npmjs.com/package/typebridge)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)

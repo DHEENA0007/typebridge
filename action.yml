@@ -1,0 +1,30 @@
+name: 'TypeBridge Schema Sync & Gate'
+description: 'Universal schema compiler. Compile or verify synchronization of data models across TypeScript, Python, Rust, and Go in CI.'
+author: 'DHEENA0007'
+
+branding:
+  icon: 'shuffle'
+  color: 'blue'
+
+inputs:
+  command:
+    description: 'Command to run: "check" (fails if out of sync) or "generate"'
+    required: false
+    default: 'check'
+  input:
+    description: 'Path to source schema file (e.g. types.ts)'
+    required: true
+  target:
+    description: 'Target language: python, rust, go, typescript, json-schema'
+    required: true
+  output:
+    description: 'Path to target output file (e.g. backend/models.py)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Run TypeBridge
+      shell: bash
+      run: |
+        npx typebridge ${{ inputs.command }} -i "${{ inputs.input }}" -t "${{ inputs.target }}" -o "${{ inputs.output }}"

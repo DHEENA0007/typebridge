@@ -3,18 +3,28 @@ import { generatePython, PythonGeneratorOptions } from './python';
 import { generateRust } from './rust';
 import { generateGo, GoGeneratorOptions } from './go';
 import { generateTypeScript, TypeScriptGeneratorOptions } from './typescript';
+import { generateJsonSchema, JsonSchemaOptions } from './json-schema';
 
 export * from './python';
 export * from './rust';
 export * from './go';
 export * from './typescript';
+export * from './json-schema';
 
-export type SupportedTarget = 'python' | 'rust' | 'go' | 'typescript' | 'ts';
+export type SupportedTarget =
+  | 'python'
+  | 'rust'
+  | 'go'
+  | 'typescript'
+  | 'ts'
+  | 'json-schema'
+  | 'json';
 
 export interface GenerateOptions {
   python?: PythonGeneratorOptions;
   go?: GoGeneratorOptions;
   typescript?: TypeScriptGeneratorOptions;
+  jsonSchema?: JsonSchemaOptions;
 }
 
 /**
@@ -38,9 +48,12 @@ export function compile(
     case 'typescript':
     case 'ts':
       return generateTypeScript(doc, options.typescript);
+    case 'json-schema':
+    case 'json':
+      return generateJsonSchema(doc, options.jsonSchema);
     default:
       throw new Error(
-        `Unsupported target: '${target}'. Supported targets: python, rust, go, typescript.`
+        `Unsupported target: '${target}'. Supported targets: python, rust, go, typescript, json-schema.`
       );
   }
 }

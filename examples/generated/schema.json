@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "schema.ts",
+  "description": "User profile entity representation",
+  "$defs": {
+    "UserRole": {
+      "type": "string",
+      "enum": [
+        "ADMIN",
+        "MEMBER",
+        "GUEST"
+      ],
+      "description": "User account role permissions"
+    },
+    "UserProfile": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/UserRole"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "age": {
+          "type": "number"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "description": "User profile entity representation",
+      "required": [
+        "id",
+        "username",
+        "email",
+        "role",
+        "isActive",
+        "tags",
+        "createdAt"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "username": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "role": {
+      "$ref": "#/$defs/UserRole"
+    },
+    "isActive": {
+      "type": "boolean"
+    },
+    "age": {
+      "type": "number"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "id",
+    "username",
+    "email",
+    "role",
+    "isActive",
+    "tags",
+    "createdAt"
+  ],
+  "additionalProperties": false
+}

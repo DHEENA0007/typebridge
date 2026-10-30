@@ -10,7 +10,7 @@ TypeBridge is built on a modular architecture designed to make contributions as 
 
 1. **Fork and clone** the repository:
    ```bash
-   git clone https://github.com/<your-username>/typebridge.git
+   git clone https://github.com/DHEENA0007/typebridge.git
    cd typebridge
    ```
 2. **Install dependencies and build**:

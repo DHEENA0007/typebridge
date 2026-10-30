@@ -76,4 +76,15 @@ describe('TypeBridge Compiler Suite', () => {
     assert.ok(ts.includes('age: z.number().optional(),'));
     assert.ok(ts.includes('tags: z.array(z.string()),'));
   });
+
+  test('compiles to standard JSON Schema', () => {
+    const doc = parseTypeScript(sampleTs, 'sample.ts');
+    const jsonStr = compile(doc, 'json-schema');
+    const parsed = JSON.parse(jsonStr);
+    assert.strictEqual(parsed.type, 'object');
+    assert.ok(parsed.properties.id);
+    assert.strictEqual(parsed.properties.id.type, 'string');
+    assert.ok(parsed.$defs.UserRole);
+    assert.deepStrictEqual(parsed.$defs.UserRole.enum, ['ADMIN', 'MEMBER', 'GUEST']);
+  });
 });
