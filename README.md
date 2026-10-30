@@ -13,6 +13,8 @@
 
 TypeBridge is a cross-language schema compiler. Write your data models once in TypeScript or JSON Schema, and TypeBridge compiles them into native, idiomatic data structures across Python, Rust, Go, and TypeScript with zero runtime overhead.
 
+Try it out in your browser with the zero-dependency [Interactive Playground](examples/playground.html).
+
 ---
 
 ## Why TypeBridge?
@@ -78,20 +80,35 @@ export interface UserProfile {
 
 ### 3. Compile to Target Languages
 
-Generate native code for any supported target:
+You can compile targets individually or configure them once in a `typebridge.config.json` file:
+
+```json
+{
+  "input": "schema/models.ts",
+  "targets": [
+    { "target": "python", "output": "backend/models.py", "options": { "usePydantic": true } },
+    { "target": "rust", "output": "src/models.rs" },
+    { "target": "go", "output": "pkg/models/models.go", "options": { "packageName": "models" } },
+    { "target": "json-schema", "output": "dist/schema.json" }
+  ]
+}
+```
+
+Run batch compilation:
 
 ```bash
-# Generate Python Pydantic models
+# Compile all configured targets in one command
+npx typebridge
+
+# Watch schema and recompile automatically on save
+npx typebridge watch
+```
+
+You can also compile single targets directly from the command line:
+
+```bash
 npx typebridge generate -i schema/models.ts -t python -o backend/models.py
-
-# Generate Rust Serde structs
 npx typebridge generate -i schema/models.ts -t rust -o src/models.rs
-
-# Generate Go structs
-npx typebridge generate -i schema/models.ts -t go -o pkg/models/models.go
-
-# Generate JSON Schema for Claude MCP or OpenAPI
-npx typebridge generate -i schema/models.ts -t json-schema -o dist/schema.json
 ```
 
 ---
@@ -190,9 +207,13 @@ type UserProfile struct {
 
 ## Preventing Schema Drift in CI
 
-TypeBridge includes a `check` command designed for continuous integration. It verifies that generated files match your source schema, exiting with code `1` if any file is out of date:
+TypeBridge includes a `check` command designed for continuous integration. It verifies that generated files match your source schema, exiting with code `1` if any file has drifted:
 
 ```bash
+# Verify all targets configured in typebridge.config.json
+npx typebridge check
+
+# Or verify a single target
 npx typebridge check -i schema/models.ts -t python -o backend/models.py
 ```
 
@@ -211,21 +232,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check Python Models
+      # Zero-config check using typebridge.config.json
+      - name: Verify All Schemas
         uses: DHEENA0007/typebridge@main
-        with:
-          command: check
-          input: schema/models.ts
-          target: python
-          output: backend/models.py
-
-      - name: Check Rust Models
-        uses: DHEENA0007/typebridge@main
-        with:
-          command: check
-          input: schema/models.ts
-          target: rust
-          output: src/models.rs
 ```
 
 ---

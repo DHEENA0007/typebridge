@@ -1,5 +1,5 @@
 name: 'TypeBridge Schema Sync & Gate'
-description: 'Universal schema compiler. Compile or verify synchronization of data models across TypeScript, Python, Rust, and Go in CI.'
+description: 'Universal schema compiler. Compile or verify synchronization of data models across TypeScript, Python, Rust, Go, and JSON Schema in CI.'
 author: 'DHEENA0007'
 
 branding:
@@ -12,14 +12,17 @@ inputs:
     required: false
     default: 'check'
   input:
-    description: 'Path to source schema file (e.g. types.ts)'
-    required: true
+    description: 'Path to source schema file (e.g. types.ts). If omitted, typebridge.config.json is used.'
+    required: false
+    default: ''
   target:
     description: 'Target language: python, rust, go, typescript, json-schema'
-    required: true
+    required: false
+    default: ''
   output:
-    description: 'Path to target output file (e.g. backend/models.py)'
-    required: true
+    description: 'Path to target output file'
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -27,4 +30,12 @@ runs:
     - name: Run TypeBridge
       shell: bash
       run: |
-        npx typebridge ${{ inputs.command }} -i "${{ inputs.input }}" -t "${{ inputs.target }}" -o "${{ inputs.output }}"
+        if [ -n "${{ inputs.input }}" ] && [ -n "${{ inputs.target }}" ]; then
+          if [ -n "${{ inputs.output }}" ]; then
+            npx typebridge ${{ inputs.command }} -i "${{ inputs.input }}" -t "${{ inputs.target }}" -o "${{ inputs.output }}"
+          else
+            npx typebridge ${{ inputs.command }} -i "${{ inputs.input }}" -t "${{ inputs.target }}"
+          fi
+        else
+          npx typebridge ${{ inputs.command }}
+        fi

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TypeBridge Playground · Universal Schema Compiler</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+      background: #090d16;
+      color: #f8fafc;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: #0f172a;
+      border-bottom: 1px solid #1e293b;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: -0.3px;
+    }
+    .tagline {
+      font-size: 13px;
+      color: #94a3b8;
+      font-weight: 400;
+    }
+    .main-container {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      overflow: hidden;
+    }
+    .panel {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #1e293b;
+      height: 100%;
+    }
+    .panel:last-child {
+      border-right: none;
+    }
+    .panel-header {
+      background: #0f172a;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #94a3b8;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .tabs {
+      display: flex;
+      gap: 6px;
+    }
+    .tab-btn {
+      background: transparent;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.15s ease;
+    }
+    .tab-btn:hover {
+      background: #1e293b;
+      color: #f8fafc;
+    }
+    .tab-btn.active {
+      background: #38bdf8;
+      color: #090d16;
+      border-color: #38bdf8;
+      font-weight: 600;
+    }
+    textarea, pre {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      background: #090d16;
+      color: #f1f5f9;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 16px;
+      border: none;
+      outline: none;
+      resize: none;
+      overflow: auto;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .status-bar {
+      background: #0b1120;
+      border-top: 1px solid #1e293b;
+      padding: 6px 16px;
+      font-size: 11px;
+      color: #64748b;
+      display: flex;
+      justify-content: space-between;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #38bdf8;
+      font-weight: 600;
+    }
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #22c55e;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span>🌉 TypeBridge</span>
+      <span class="tagline">Universal Polyglot Schema Playground</span>
+    </div>
+    <div class="badge">
+      <span class="badge-dot"></span>
+      Client-side Compiler Active
+    </div>
+  </header>
+
+  <div class="main-container">
+    <!-- Left: Source TypeScript Editor -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>Source: TypeScript Interface (Input)</span>
+        <span style="font-size: 11px; color: #64748b;">Edit to recompile live</span>
+      </div>
+      <textarea id="tsInput" spellcheck="false">/**
+ * User account role permissions
+ */
+export type UserRole = 'ADMIN' | 'MEMBER' | 'GUEST';
+
+/**
+ * User profile entity representation
+ */
+export interface UserProfile {
+  id: string;
+  username: string;
+  email: string;
+  role: UserRole;
+  isActive: boolean;
+  age?: number;
+  tags: string[];
+  createdAt: Date;
+}</textarea>
+    </div>
+
+    <!-- Right: Target Output -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="tabs">
+          <button class="tab-btn active" onclick="setTarget('python')">Python (Pydantic v2)</button>
+          <button class="tab-btn" onclick="setTarget('rust')">Rust (Serde)</button>
+          <button class="tab-btn" onclick="setTarget('go')">Go (Structs)</button>
+          <button class="tab-btn" onclick="setTarget('json')">JSON Schema (MCP)</button>
+        </div>
+        <span id="timing" style="font-size: 11px; color: #64748b;">Compiled in &lt;1ms</span>
+      </div>
+      <pre id="codeOutput"></pre>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <span>Zero runtime overhead · Compiled from AST representation</span>
+    <span><a href="https://github.com/DHEENA0007/typebridge" target="_blank" style="color: #38bdf8; text-decoration: none;">GitHub Repository ↗</a></span>
+  </div>
+
+  <script>
+    let currentTarget = 'python';
+
+    function setTarget(t) {
+      currentTarget = t;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      recompile();
+    }
+
+    // Lightweight client-side parser & emitter mirroring the TypeBridge AST
+    function parseTsModels(text) {
+      const enums = [];
+      const structs = [];
+
+      // Parse union enum: export type UserRole = 'ADMIN' | 'MEMBER' ...
+      const enumMatch = text.match(/export\s+type\s+(\w+)\s*=\s*([^;]+);/);
+      if (enumMatch) {
+        const name = enumMatch[1];
+        const values = enumMatch[2].split('|').map(s => s.trim().replace(/['"]/g, '')).filter(Boolean);
+        enums.push({ name, values });
+      }
+
+      // Parse interface: export interface UserProfile { ... }
+      const interfaceMatch = text.match(/export\s+interface\s+(\w+)\s*\{([\s\S]*?)\}/);
+      if (interfaceMatch) {
+        const name = interfaceMatch[1];
+        const body = interfaceMatch[2];
+        const fields = [];
+        const lines = body.split('\n');
+
+        for (const line of lines) {
+          const fieldMatch = line.match(/^\s*(\w+)(\??)\s*:\s*([^;]+);/);
+          if (fieldMatch) {
+            fields.push({
+              name: fieldMatch[1],
+              optional: fieldMatch[2] === '?',
+              type: fieldMatch[3].trim()
+            });
+          }
+        }
+        structs.push({ name, fields });
+      }
+
+      return { enums, structs };
+    }
+
+    function emitPython(ast) {
+      let code = `# Auto-generated by TypeBridge. DO NOT EDIT DIRECTLY.\nfrom __future__ import annotations\nfrom typing import Optional, List, Dict\nfrom enum import Enum\nfrom datetime import datetime\nfrom pydantic import BaseModel, Field, ConfigDict\n\n`;
+      for (const e of ast.enums) {
+        code += `class ${e.name}(str, Enum):\n`;
+        for (const v of e.values) code += `    ${v.toUpperCase()} = "${v}"\n`;
+        code += '\n';
+      }
+      for (const s of ast.structs) {
+        code += `class ${s.name}(BaseModel):\n    model_config = ConfigDict(populate_by_name=True)\n\n`;
+        for (const f of s.fields) {
+          const pyName = f.name.replace(/([A-Z])/g, '_$1').toLowerCase();
+          let pyType = mapTypeToPy(f.type);
+          const alias = pyName !== f.name ? `, alias="${f.name}"` : '';
+          if (f.optional) {
+            code += `    ${pyName}: Optional[${pyType}] = Field(default=None${alias})\n`;
+          } else {
+            code += alias ? `    ${pyName}: ${pyType} = Field(...${alias})\n` : `    ${pyName}: ${pyType}\n`;
+          }
+        }
+        code += '\n';
+      }
+      return code;
+    }
+
+    function emitRust(ast) {
+      let code = `// Auto-generated by TypeBridge. DO NOT EDIT DIRECTLY.\nuse serde::{Deserialize, Serialize};\nuse chrono::{DateTime, Utc};\n\n`;
+      for (const e of ast.enums) {
+        code += `#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]\npub enum ${e.name} {\n`;
+        for (const v of e.values) code += `    ${v.charAt(0) + v.slice(1).toLowerCase()},\n`;
+        code += '}\n\n';
+      }
+      for (const s of ast.structs) {
+        code += `#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]\npub struct ${s.name} {\n`;
+        for (const f of s.fields) {
+          const rustName = f.name.replace(/([A-Z])/g, '_$1').toLowerCase();
+          const rustType = mapTypeToRust(f.type);
+          if (rustName !== f.name) code += `    #[serde(rename = "${f.name}")]\n`;
+          if (f.optional) {
+            code += `    #[serde(skip_serializing_if = "Option::is_none")]\n    pub ${rustName}: Option<${rustType}>,\n`;
+          } else {
+            code += `    pub ${rustName}: ${rustType},\n`;
+          }
+        }
+        code += '}\n\n';
+      }
+      return code;
+    }
+
+    function emitGo(ast) {
+      let code = `// Code generated by TypeBridge. DO NOT EDIT.\npackage models\n\nimport (\n\t"time"\n)\n\n`;
+      for (const e of ast.enums) {
+        code += `type ${e.name} string\n\nconst (\n`;
+        for (const v of e.values) code += `\t${e.name}${v.charAt(0) + v.slice(1).toLowerCase()} ${e.name} = "${v}"\n`;
+        code += ')\n\n';
+      }
+      for (const s of ast.structs) {
+        code += `type ${s.name} struct {\n`;
+        for (const f of s.fields) {
+          const goName = f.name.charAt(0).toUpperCase() + f.name.slice(1);
+          const goType = mapTypeToGo(f.type);
+          const tag = f.optional ? `\`json:"${f.name},omitempty"\`` : `\`json:"${f.name}"\``;
+          code += f.optional ? `\t${goName} *${goType} ${tag}\n` : `\t${goName} ${goType} ${tag}\n`;
+        }
+        code += '}\n\n';
+      }
+      return code;
+    }
+
+    function emitJsonSchema(ast) {
+      const schema = {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        title: ast.structs[0]?.name || 'Schema',
+        type: 'object',
+        properties: {},
+        required: []
+      };
+      if (ast.structs[0]) {
+        for (const f of ast.structs[0].fields) {
+          schema.properties[f.name] = mapTypeToJson(f.type);
+          if (!f.optional) schema.required.push(f.name);
+        }
+      }
+      return JSON.stringify(schema, null, 2);
+    }
+
+    function mapTypeToPy(t) {
+      if (t === 'string') return 'str';
+      if (t === 'number') return 'float';
+      if (t === 'boolean') return 'bool';
+      if (t === 'Date') return 'datetime';
+      if (t.endsWith('[]')) return `List[${mapTypeToPy(t.slice(0, -2))}]`;
+      return t;
+    }
+
+    function mapTypeToRust(t) {
+      if (t === 'string') return 'String';
+      if (t === 'number') return 'f64';
+      if (t === 'boolean') return 'bool';
+      if (t === 'Date') return 'DateTime<Utc>';
+      if (t.endsWith('[]')) return `Vec<${mapTypeToRust(t.slice(0, -2))}>`;
+      return t;
+    }
+
+    function mapTypeToGo(t) {
+      if (t === 'string') return 'string';
+      if (t === 'number') return 'float64';
+      if (t === 'boolean') return 'bool';
+      if (t === 'Date') return 'time.Time';
+      if (t.endsWith('[]')) return `[]${mapTypeToGo(t.slice(0, -2))}`;
+      return t;
+    }
+
+    function mapTypeToJson(t) {
+      if (t === 'string') return { type: 'string' };
+      if (t === 'number') return { type: 'number' };
+      if (t === 'boolean') return { type: 'boolean' };
+      if (t === 'Date') return { type: 'string', format: 'date-time' };
+      if (t.endsWith('[]')) return { type: 'array', items: mapTypeToJson(t.slice(0, -2)) };
+      return { $ref: `#/$defs/${t}` };
+    }
+
+    function recompile() {
+      const t0 = performance.now();
+      const input = document.getElementById('tsInput').value;
+      const ast = parseTsModels(input);
+      let out = '';
+      if (currentTarget === 'python') out = emitPython(ast);
+      else if (currentTarget === 'rust') out = emitRust(ast);
+      else if (currentTarget === 'go') out = emitGo(ast);
+      else if (currentTarget === 'json') out = emitJsonSchema(ast);
+
+      document.getElementById('codeOutput').textContent = out;
+      const ms = (performance.now() - t0).toFixed(1);
+      document.getElementById('timing').textContent = `Compiled in ${ms}ms`;
+    }
+
+    document.getElementById('tsInput').addEventListener('input', recompile);
+    recompile();
+  </script>
+</body>
+</html>

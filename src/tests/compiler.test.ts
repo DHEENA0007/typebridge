@@ -87,4 +87,16 @@ describe('TypeBridge Compiler Suite', () => {
     assert.ok(parsed.$defs.UserRole);
     assert.deepStrictEqual(parsed.$defs.UserRole.enum, ['ADMIN', 'MEMBER', 'GUEST']);
   });
+
+  test('loads typebridge.config.json correctly', async () => {
+    const { loadConfig } = await import('../config');
+    const loaded = loadConfig();
+    assert.ok(loaded);
+    assert.strictEqual(loaded.config.input, 'examples/schema.ts');
+    assert.strictEqual(loaded.config.targets.length, 4);
+    assert.ok(loaded.config.targets.some((t: any) => t.target === 'python'));
+    assert.ok(loaded.config.targets.some((t: any) => t.target === 'rust'));
+    assert.ok(loaded.config.targets.some((t: any) => t.target === 'go'));
+    assert.ok(loaded.config.targets.some((t: any) => t.target === 'json-schema'));
+  });
 });

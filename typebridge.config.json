@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/DHEENA0007/typebridge/main/schema.json",
+  "input": "examples/schema.ts",
+  "targets": [
+    {
+      "target": "python",
+      "output": "examples/generated/models.py",
+      "options": {
+        "usePydantic": true
+      }
+    },
+    {
+      "target": "rust",
+      "output": "examples/generated/models.rs"
+    },
+    {
+      "target": "go",
+      "output": "examples/generated/models.go",
+      "options": {
+        "packageName": "models"
+      }
+    },
+    {
+      "target": "json-schema",
+      "output": "examples/generated/schema.json"
+    }
+  ]
+}
