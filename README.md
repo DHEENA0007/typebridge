@@ -33,13 +33,18 @@ TypeBridge solves this by treating your types as code that can be compiled. You 
 
 ## Supported Targets
 
-| Language / Format | Output Style | Target Libraries |
+| Language / Format | Output Style | Target Libraries / Specifications |
 | :--- | :--- | :--- |
 | **Python** | Pydantic v2 `BaseModel` or `@dataclass` | `pydantic >= 2.0`, Python 3.10+ |
 | **Rust** | `pub struct`, `pub enum` | `serde` (`Serialize`, `Deserialize`) |
 | **Go** | `type ... struct` with JSON tags | `encoding/json`, Go 1.20+ |
 | **TypeScript** | `interface` + optional Zod schema | `zod >= 3.0`, TypeScript 5.0+ |
-| **JSON Schema** | Draft 2020-12 / OpenAPI 3.1 | Claude MCP tools, OpenAPI specs |
+| **GraphQL** | SDL `type`, `input`, `enum`, `union` | GraphQL Draft & Spec 2021 |
+| **OpenAPI 3.1** | Component Schemas & Paths | OpenAPI 3.1.0 specifications |
+| **AI / MCP Tools** | Claude / LLM function calling schemas | Model Context Protocol (MCP) |
+| **JSON Schema** | Draft 2020-12 format | JSON Schema Draft 2020-12 |
+| **Markdown** | Data dictionary documentation tables | GitHub Flavored Markdown (GFM) |
+
 
 ---
 
@@ -239,18 +244,57 @@ jobs:
 
 ---
 
+---
+
+## Developer Features
+
+### 1. Interactive Local Studio (`typebridge studio`)
+Run a zero-dependency, real-time web compiler studio in your browser on `localhost:3456`:
+
+```bash
+npx typebridge studio
+```
+
+Edit TypeScript models on the left and see immediate live previews across Python Pydantic, Rust Serde, Go, Zod, GraphQL, OpenAPI 3.1, Claude MCP, Markdown, and Generative Mock Data with one-click clipboard copying.
+
+### 2. Generative Mock Test Data (`typebridge mock`)
+Synthesize realistic JSON test data that strictly adheres to your types, enums, dates, and nested structures:
+
+```bash
+# Generate 3 mock JSON objects for UserProfile
+npx typebridge mock schema/models.ts UserProfile -n 3
+```
+
+### 3. Breaking Change Evolution Gate (`typebridge diff`)
+Prevent silent API breakage in continuous integration by diffing two schema versions before release:
+
+```bash
+npx typebridge diff schema/v1.ts schema/v2.ts
+```
+
+Fails CI with exit code `1` if breaking changes are introduced (e.g. required field additions, removed fields, or type narrowing).
+
+### 4. Documentation Health & Coverage (`typebridge stats`)
+Measure JSDoc documentation completeness across your schemas:
+
+```bash
+npx typebridge stats -i schema/models.ts
+```
+
+---
+
 ## Programmatic API
 
 TypeBridge can also be used as a Node.js library in custom build scripts:
 
 ```typescript
-import { parseTypeScript, compile } from 'typebridge';
+import { parseTypeScript, compile, generateMockData, diffSchemas } from 'typebridge';
 
 const source = `
   export interface SensorReading {
     sensorId: string;
     temperature: number;
-    recordedAt: Date;
+    recordedAt: string;
   }
 `;
 
@@ -261,6 +305,11 @@ const doc = parseTypeScript(source, 'sensor.ts');
 const pythonCode = compile(doc, 'python');
 const rustCode = compile(doc, 'rust');
 const goCode = compile(doc, 'go', { go: { packageName: 'sensor' } });
+const gqlCode = compile(doc, 'graphql');
+const oasCode = compile(doc, 'openapi');
+
+// Generate realistic mock data
+const mock = generateMockData(doc, 'SensorReading', { count: 3 });
 ```
 
 ---
@@ -271,16 +320,27 @@ const goCode = compile(doc, 'go', { go: { packageName: 'sensor' } });
 typebridge [command] [options]
 
 Commands:
-  generate    Compile input schema into target language code
-  check       Verify that output file matches source schema (CI gate)
+  generate (default) Compile schemas to target languages
+  check              Verify existing outputs match source schema (CI gate)
+  watch              Watch schema file and compile on save
+  diff <base> <new>  Analyze breaking API changes between two schema versions
+  stats              Display schema metrics and JSDoc documentation coverage
+  mock [file] [type] Synthesize realistic mock JSON data from schema
+  studio / serve     Launch local real-time web compiler studio
+  init               Scaffold starter configuration and models
 
 Options:
-  -i, --input    Source schema file path (required)
-  -t, --target   Target: python, rust, go, typescript, json-schema (required)
+  -c, --config   Path to configuration file (defaults to typebridge.config.json)
+  -i, --input    Source schema file path (e.g. models.ts)
+  -t, --target   Target: python, rust, go, typescript, json-schema, markdown, graphql, openapi, mcp
   -o, --output   Destination output file path
+  -p, --port     Port for studio server (defaults to 3456)
+  -n, --count    Number of mock data items to synthesize (defaults to 1)
+  -w, --watch    Watch for changes after running
   -h, --help     Show usage help
   -v, --version  Show version number
 ```
+
 
 ---
 
