@@ -22,6 +22,15 @@
         "maintenance",
         "projectManagement"
       ]
+    },
+    {
+      "login": "KANAGARAJ-M",
+      "name": "Kanagaraj.M",
+      "avatar_url": "https://avatars.githubusercontent.com/u/112673484?v=4",
+      "profile": "https://github.com/KANAGARAJ-M",
+      "contributions": [
+        "doc"
+      ]
     }
   ],
   "contributorsPerLine": 7
