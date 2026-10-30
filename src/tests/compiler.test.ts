@@ -88,15 +88,104 @@ describe('TypeBridge Compiler Suite', () => {
     assert.deepStrictEqual(parsed.$defs.UserRole.enum, ['ADMIN', 'MEMBER', 'GUEST']);
   });
 
+  test('compiles to Markdown documentation table', () => {
+    const doc = parseTypeScript(sampleTs, 'sample.ts');
+    const md = compile(doc, 'markdown');
+    assert.ok(md.includes('# sample.ts'));
+    assert.ok(md.includes('## UserProfile'));
+    assert.ok(md.includes('| Field | Type | Required | Description |'));
+    assert.ok(md.includes('| `username` | `string` | **Yes** |'));
+    assert.ok(md.includes('| `age` | `number` | No |'));
+  });
+
+  test('compiles to GraphQL SDL', () => {
+    const doc = parseTypeScript(sampleTs, 'sample.ts');
+    const gql = compile(doc, 'graphql');
+    assert.ok(gql.includes('type UserProfile {'));
+    assert.ok(gql.includes('id: ID!'));
+    assert.ok(gql.includes('username: String!'));
+    assert.ok(gql.includes('age: Float'));
+    assert.ok(gql.includes('tags: [String!]!'));
+    assert.ok(gql.includes('enum UserRole {'));
+    assert.ok(gql.includes('ADMIN'));
+  });
+
+  test('compiles to OpenAPI 3.1 and MCP Tools', () => {
+    const doc = parseTypeScript(sampleTs, 'sample.ts');
+    const oasStr = compile(doc, 'openapi');
+    const oas = JSON.parse(oasStr);
+    assert.strictEqual(oas.openapi, '3.1.0');
+    assert.ok(oas.components.schemas.UserProfile);
+    assert.strictEqual(oas.components.schemas.UserProfile.type, 'object');
+
+    const mcpStr = compile(doc, 'mcp');
+    const mcp = JSON.parse(mcpStr);
+    assert.ok(Array.isArray(mcp.tools));
+    assert.strictEqual(mcp.tools[0].name, 'create_user_profile');
+  });
+
+  test('generates realistic mock JSON data', async () => {
+    const { generateMockData } = await import('../mock');
+    const doc = parseTypeScript(sampleTs, 'sample.ts');
+    const mock = generateMockData(doc, 'UserProfile', { count: 1 });
+    assert.ok(mock.id);
+    assert.ok(mock.username);
+    assert.ok(mock.email.includes('@'));
+    assert.ok(['ADMIN', 'MEMBER', 'GUEST'].includes(mock.role));
+    assert.ok(Array.isArray(mock.tags));
+  });
+
   test('loads typebridge.config.json correctly', async () => {
     const { loadConfig } = await import('../config');
     const loaded = loadConfig();
     assert.ok(loaded);
     assert.strictEqual(loaded.config.input, 'examples/schema.ts');
-    assert.strictEqual(loaded.config.targets.length, 4);
+    assert.strictEqual(loaded.config.targets.length, 7);
     assert.ok(loaded.config.targets.some((t: any) => t.target === 'python'));
     assert.ok(loaded.config.targets.some((t: any) => t.target === 'rust'));
     assert.ok(loaded.config.targets.some((t: any) => t.target === 'go'));
     assert.ok(loaded.config.targets.some((t: any) => t.target === 'json-schema'));
+    assert.ok(loaded.config.targets.some((t: any) => t.target === 'markdown'));
+    assert.ok(loaded.config.targets.some((t: any) => t.target === 'graphql'));
+    assert.ok(loaded.config.targets.some((t: any) => t.target === 'openapi'));
+  });
+
+  test('diffSchemas detects breaking vs non-breaking changes', async () => {
+    const { diffSchemas } = await import('../analyzer');
+    const v1 = parseTypeScript(`
+      export interface User { id: string; email?: string; }
+    `);
+    const v2Breaking = parseTypeScript(`
+      export interface User { id: string; email: string; }
+    `);
+    const v2Compatible = parseTypeScript(`
+      export interface User { id: string; email?: string; nickname?: string; }
+    `);
+
+    const resBreaking = diffSchemas(v1, v2Breaking);
+    assert.strictEqual(resBreaking.isCompatible, false);
+    assert.ok(resBreaking.breaking.some((b) => b.includes('changed from optional to required')));
+
+    const resCompatible = diffSchemas(v1, v2Compatible);
+    assert.strictEqual(resCompatible.isCompatible, true);
+    assert.strictEqual(resCompatible.breaking.length, 0);
+    assert.strictEqual(resCompatible.nonBreaking.length, 1);
+  });
+
+  test('getSchemaStats computes documentation coverage', async () => {
+    const { getSchemaStats } = await import('../analyzer');
+    const doc = parseTypeScript(`
+      /** User account */
+      export interface User {
+        /** Unique identifier */
+        id: string;
+        username: string;
+      }
+    `);
+    const stats = getSchemaStats(doc);
+    assert.strictEqual(stats.modelsCount, 1);
+    assert.strictEqual(stats.totalFieldsCount, 2);
+    assert.strictEqual(stats.documentedFieldsCount, 1);
+    assert.strictEqual(stats.docCoveragePercent, 50);
   });
 });

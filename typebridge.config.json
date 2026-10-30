@@ -23,6 +23,18 @@
     {
       "target": "json-schema",
       "output": "examples/generated/schema.json"
+    },
+    {
+      "target": "markdown",
+      "output": "examples/generated/MODELS.md"
+    },
+    {
+      "target": "graphql",
+      "output": "examples/generated/schema.graphql"
+    },
+    {
+      "target": "openapi",
+      "output": "examples/generated/openapi.json"
     }
   ]
 }

@@ -5,6 +5,9 @@ import * as path from 'path';
 import { parseTypeScript } from '../parsers/typescript';
 import { compile, SupportedTarget } from '../generators';
 import { loadConfig, TypeBridgeConfig } from '../config';
+import { getSchemaStats, diffSchemas } from '../analyzer';
+import { generateMockJson } from '../mock';
+import { startStudioServer } from '../server/studio';
 
 const VERSION = '0.1.0';
 
@@ -20,23 +23,33 @@ Commands:
   generate (default) Compile schemas to target languages
   check              Verify existing outputs match source schema (CI gate)
   watch              Watch schema file and compile on save
+  diff <base> <new>  Analyze breaking API changes between two schema versions
+  stats              Display schema metrics and JSDoc documentation coverage
+  mock [file] [type] Synthesize realistic mock JSON data from schema
+  studio / serve     Launch local real-time web compiler studio
+  init               Scaffold starter configuration and models
 
 Options:
   -c, --config   Path to configuration file (defaults to typebridge.config.json)
   -i, --input    Source schema file path (e.g. models.ts)
-  -t, --target   Target: python, rust, go, typescript, json-schema
+  -t, --target   Target: python, rust, go, typescript, json-schema, markdown, graphql, openapi, mcp
   -o, --output   Destination output file path
+  -p, --port     Port for studio server (defaults to 3456)
+  -n, --count    Number of mock data items to synthesize (defaults to 1)
   -w, --watch    Watch for changes after running
   -h, --help     Show usage help
   -v, --version  Show version number
 
 Examples:
   typebridge                                   # Batch compile using typebridge.config.json
-  typebridge check                             # Batch verify all targets in CI
-  typebridge watch                             # Auto-compile on save
-  typebridge generate -i types.ts -t python -o models.py
+  typebridge studio                            # Launch local web studio playground
+  typebridge mock schema/models.ts User -n 3   # Generate 3 mock JSON objects for User
+  typebridge diff schema/v1.ts schema/v2.ts    # Detect breaking schema changes
+  typebridge stats -i schema/models.ts         # Inspect documentation coverage & stats
+  typebridge init                              # Scaffold starter project
 `);
 }
+
 
 interface ParsedArgs {
   command?: string;
@@ -44,13 +57,16 @@ interface ParsedArgs {
   input?: string;
   target?: string;
   output?: string;
+  port?: number;
+  count?: number;
   watch?: boolean;
   help?: boolean;
   version?: boolean;
+  positional: string[];
 }
 
 function parseArgs(args: string[]): ParsedArgs {
-  const result: ParsedArgs = {};
+  const result: ParsedArgs = { positional: [] };
   let i = 0;
 
   if (args.length > 0 && !args[0].startsWith('-')) {
@@ -74,11 +90,18 @@ function parseArgs(args: string[]): ParsedArgs {
       result.target = args[++i];
     } else if (arg === '-o' || arg === '--output') {
       result.output = args[++i];
+    } else if (arg === '-p' || arg === '--port') {
+      result.port = parseInt(args[++i], 10);
+    } else if (arg === '-n' || arg === '--count') {
+      result.count = parseInt(args[++i], 10);
+    } else if (!arg.startsWith('-')) {
+      result.positional.push(arg);
     }
   }
 
   return result;
 }
+
 
 function compileSingle(inputPath: string, target: SupportedTarget, options: Record<string, any> = {}): string {
   const sourceCode = fs.readFileSync(inputPath, 'utf-8');
@@ -166,6 +189,60 @@ function startWatch(inputPath: string, onTrigger: () => void) {
   });
 }
 
+function executeInit() {
+  const configPath = path.resolve(process.cwd(), 'typebridge.config.json');
+  const schemaDir = path.resolve(process.cwd(), 'schema');
+  const schemaPath = path.resolve(schemaDir, 'models.ts');
+
+  if (fs.existsSync(configPath)) {
+    console.log('typebridge.config.json already exists.');
+    return;
+  }
+
+  if (!fs.existsSync(schemaDir)) {
+    fs.mkdirSync(schemaDir, { recursive: true });
+  }
+
+  if (!fs.existsSync(schemaPath)) {
+    const starterSchema = `/**
+ * User account authorization levels
+ */
+export type UserRole = 'ADMIN' | 'MEMBER' | 'GUEST';
+
+/**
+ * Shared user profile representation
+ */
+export interface UserProfile {
+  id: string;
+  username: string;
+  email: string;
+  role: UserRole;
+  isActive: boolean;
+  age?: number;
+  tags: string[];
+  createdAt: Date;
+}
+`;
+    fs.writeFileSync(schemaPath, starterSchema, 'utf-8');
+    console.log('  ✓ Created schema/models.ts');
+  }
+
+  const starterConfig: TypeBridgeConfig = {
+    input: 'schema/models.ts',
+    targets: [
+      { target: 'python', output: 'backend/models.py', options: { usePydantic: true } },
+      { target: 'rust', output: 'src/models.rs' },
+      { target: 'go', output: 'pkg/models/models.go', options: { packageName: 'models' } },
+      { target: 'json-schema', output: 'dist/schema.json' },
+      { target: 'markdown', output: 'docs/MODELS.md' }
+    ]
+  };
+
+  fs.writeFileSync(configPath, JSON.stringify(starterConfig, null, 2), 'utf-8');
+  console.log('  ✓ Created typebridge.config.json');
+  console.log('\nTypeBridge initialized! Run `npx typebridge` to compile.');
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
 
@@ -181,7 +258,106 @@ async function main() {
 
   const command = args.command || (args.watch ? 'watch' : 'generate');
 
-  // Check if a configuration file exists or is specified
+  // Command: init
+  if (command === 'init') {
+    executeInit();
+    return;
+  }
+
+  // Command: diff <base> <new>
+  if (command === 'diff') {
+    const fileA = args.positional[0] || args.input;
+    const fileB = args.positional[1];
+    if (!fileA || !fileB) {
+      console.error('Error: "diff" requires two schema files: `typebridge diff <baseSchema> <newSchema>`');
+      process.exit(1);
+    }
+    const pathA = path.resolve(process.cwd(), fileA);
+    const pathB = path.resolve(process.cwd(), fileB);
+    if (!fs.existsSync(pathA) || !fs.existsSync(pathB)) {
+      console.error('Error: One or both schema files do not exist.');
+      process.exit(1);
+    }
+    const docA = parseTypeScript(fs.readFileSync(pathA, 'utf-8'), path.basename(pathA));
+    const docB = parseTypeScript(fs.readFileSync(pathB, 'utf-8'), path.basename(pathB));
+    const result = diffSchemas(docA, docB);
+
+    console.log(`\nTypeBridge Schema Diff: ${fileA} ➔ ${fileB}\n`);
+    if (result.nonBreaking.length > 0) {
+      console.log('Non-Breaking Changes:');
+      for (const item of result.nonBreaking) console.log(`  + ${item}`);
+      console.log('');
+    }
+    if (result.breaking.length > 0) {
+      console.log('🚨 Breaking Changes Detected:');
+      for (const item of result.breaking) console.log(`  ✗ ${item}`);
+      console.log('\nResult: Incompatible schema modification. CI gate failed.');
+      process.exit(1);
+    } else {
+      console.log('✓ All changes are backward-compatible.');
+      return;
+    }
+  }
+
+  // Command: stats
+  if (command === 'stats') {
+    const loaded = loadConfig(process.cwd());
+    const targetFile = args.input || (loaded ? loaded.config.input : 'schema/models.ts');
+    const targetPath = path.resolve(process.cwd(), targetFile);
+    if (!fs.existsSync(targetPath)) {
+      console.error(`Error: Schema file not found: ${targetPath}`);
+      process.exit(1);
+    }
+    const doc = parseTypeScript(fs.readFileSync(targetPath, 'utf-8'), path.basename(targetPath));
+    const stats = getSchemaStats(doc);
+
+    console.log(`\n📊 Schema Analysis: ${targetFile}`);
+    console.log('─'.repeat(40));
+    console.log(`  Models (Structs):       ${stats.modelsCount}`);
+    console.log(`  Enums:                  ${stats.enumsCount}`);
+    console.log(`  Total Fields:           ${stats.totalFieldsCount}`);
+    console.log(`  Documented Fields:      ${stats.documentedFieldsCount} / ${stats.totalFieldsCount}`);
+    console.log(`  JSDoc Doc Coverage:     ${stats.docCoveragePercent}%`);
+    console.log('─'.repeat(40));
+    return;
+  }
+
+  // Command: mock [file] [type]
+  if (command === 'mock') {
+    const loaded = loadConfig(process.cwd());
+    const targetFile =
+      args.input ||
+      args.positional[0] ||
+      (loaded ? loaded.config.input : 'schema/models.ts');
+    const targetPath = path.resolve(process.cwd(), targetFile);
+    if (!fs.existsSync(targetPath)) {
+      console.error(`Error: Schema file not found: ${targetPath}`);
+      process.exit(1);
+    }
+    const doc = parseTypeScript(
+      fs.readFileSync(targetPath, 'utf-8'),
+      path.basename(targetPath)
+    );
+    const typeName = args.positional[1];
+    const count = args.count || 1;
+    const jsonOutput = generateMockJson(doc, typeName, { count });
+    console.log(jsonOutput);
+    return;
+  }
+
+  // Command: studio / serve
+  if (command === 'studio' || command === 'serve') {
+    const loaded = loadConfig(process.cwd());
+    const targetFile =
+      args.input ||
+      args.positional[0] ||
+      (loaded ? path.resolve(path.dirname(loaded.configPath), loaded.config.input) : undefined);
+    const port = args.port || 3456;
+    startStudioServer({ port, initialFile: targetFile });
+    return;
+  }
+
+  // Load config if exists
   const loaded = args.config
     ? {
         config: JSON.parse(fs.readFileSync(path.resolve(process.cwd(), args.config), 'utf-8')),
