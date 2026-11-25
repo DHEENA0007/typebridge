@@ -15,13 +15,13 @@ body:
     id: language
     attributes:
       label: Target Language or Format
-      placeholder: e.g., Kotlin, Swift, C#, Protobuf, Valibot
+      placeholder: e.g., C#, Java, Protobuf, Valibot, SQL
     validations:
       required: true
   - type: textarea
     id: libraries
     attributes:
       label: Target Idioms / Libraries
-      placeholder: e.g., kotlinx.serialization data classes, Swift Codable structs
+      placeholder: e.g., C# System.Text.Json records, Java Jackson records, Protobuf v3 messages
     validations:
       required: true

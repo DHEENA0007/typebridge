@@ -24,12 +24,23 @@ export type TypeNode =
   | { kind: 'union'; types: TypeNode[] }
   | { kind: 'literal'; value: string | number | boolean };
 
+export interface FieldConstraints {
+  format?: string;
+  minimum?: number;
+  maximum?: number;
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string;
+}
+
 export interface FieldDefinition {
   name: string;
   type: TypeNode;
   optional: boolean;
   description?: string;
   defaultValue?: string | number | boolean | null;
+  constraints?: FieldConstraints;
+  deprecated?: boolean;
 }
 
 export interface EnumValue {

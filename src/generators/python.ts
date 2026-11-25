@@ -82,15 +82,36 @@ function generateStruct(
     }
 
     if (options.usePydantic) {
+      const fieldArgs: string[] = [];
+      if (field.defaultValue !== undefined) {
+        fieldArgs.push(`default=${formatPythonLiteral(field.defaultValue)}`);
+      } else if (field.optional) {
+        fieldArgs.push('default=None');
+      } else {
+        fieldArgs.push('...');
+      }
+
+      if (isAliased) fieldArgs.push(`alias="${field.name}"`);
+      if (field.constraints) {
+        if (field.constraints.minimum !== undefined) fieldArgs.push(`ge=${field.constraints.minimum}`);
+        if (field.constraints.maximum !== undefined) fieldArgs.push(`le=${field.constraints.maximum}`);
+        if (field.constraints.minLength !== undefined) fieldArgs.push(`min_length=${field.constraints.minLength}`);
+        if (field.constraints.maxLength !== undefined) fieldArgs.push(`max_length=${field.constraints.maxLength}`);
+        if (field.constraints.pattern !== undefined) fieldArgs.push(`pattern=${JSON.stringify(field.constraints.pattern)}`);
+      }
+
+      const hasConstraints = Boolean(field.constraints && Object.keys(field.constraints).length > 0);
+      const hasDefault = field.defaultValue !== undefined;
+
       if (field.optional) {
-        if (isAliased) {
-          lines.push(`    ${pyName}: Optional[${pyType}] = Field(default=None, alias="${field.name}")`);
+        if (isAliased || hasConstraints || hasDefault) {
+          lines.push(`    ${pyName}: Optional[${pyType}] = Field(${fieldArgs.join(', ')})`);
         } else {
           lines.push(`    ${pyName}: Optional[${pyType}] = None`);
         }
       } else {
-        if (isAliased) {
-          lines.push(`    ${pyName}: ${pyType} = Field(..., alias="${field.name}")`);
+        if (isAliased || hasConstraints || hasDefault) {
+          lines.push(`    ${pyName}: ${pyType} = Field(${fieldArgs.join(', ')})`);
         } else {
           lines.push(`    ${pyName}: ${pyType}`);
         }
@@ -159,6 +180,14 @@ function mapTypeToPython(node: TypeNode): string {
     default:
       return 'Any';
   }
+}
+
+function formatPythonLiteral(val: string | number | boolean | null): string {
+  if (val === null) return 'None';
+  if (val === true) return 'True';
+  if (val === false) return 'False';
+  if (typeof val === 'number') return String(val);
+  return JSON.stringify(val);
 }
 
 function toSnakeCase(str: string): string {

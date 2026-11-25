@@ -8,6 +8,7 @@ import {
   TypeNode,
   EnumValue,
   ParserDiagnostic,
+  FieldConstraints,
 } from '../ir/types';
 
 interface PendingStructResolution {
@@ -208,7 +209,7 @@ function parseInterface(
     if (ts.isPropertySignature(member) && member.name) {
       const fieldName = member.name.getText(sourceFile).replace(/['"]/g, '');
       const optional = member.questionToken !== undefined;
-      const fieldDesc = extractJsDoc(member, sourceFile);
+      const meta = extractJsDocMeta(member, sourceFile);
       const type = member.type
         ? parseTypeNode(member.type, sourceFile, displayFile, ctx)
         : { kind: 'primitive' as const, primitive: 'any' as const };
@@ -217,7 +218,10 @@ function parseInterface(
         name: fieldName,
         type,
         optional,
-        description: fieldDesc,
+        description: meta.description,
+        ...(meta.defaultValue !== undefined ? { defaultValue: meta.defaultValue } : {}),
+        ...(meta.constraints ? { constraints: meta.constraints } : {}),
+        ...(meta.deprecated ? { deprecated: true } : {}),
       });
     } else if (!ts.isPropertySignature(member)) {
       addDiagnostic(
@@ -374,7 +378,7 @@ function parseTypeLiteralMembers(
     if (ts.isPropertySignature(member) && member.name) {
       const fieldName = member.name.getText(sourceFile).replace(/['"]/g, '');
       const optional = member.questionToken !== undefined;
-      const fieldDesc = extractJsDoc(member, sourceFile);
+      const meta = extractJsDocMeta(member, sourceFile);
       const type = member.type
         ? parseTypeNode(member.type, sourceFile, displayFile, ctx)
         : { kind: 'primitive' as const, primitive: 'any' as const };
@@ -383,7 +387,10 @@ function parseTypeLiteralMembers(
         name: fieldName,
         type,
         optional,
-        description: fieldDesc,
+        description: meta.description,
+        ...(meta.defaultValue !== undefined ? { defaultValue: meta.defaultValue } : {}),
+        ...(meta.constraints ? { constraints: meta.constraints } : {}),
+        ...(meta.deprecated ? { deprecated: true } : {}),
       });
     }
   }
@@ -590,21 +597,88 @@ function parseTypeNode(
   }
 }
 
+interface JsDocMeta {
+  description?: string;
+  constraints?: FieldConstraints;
+  defaultValue?: string | number | boolean | null;
+  deprecated?: boolean;
+}
+
 function extractJsDoc(node: ts.Node, sourceFile: ts.SourceFile): string | undefined {
+  return extractJsDocMeta(node, sourceFile).description;
+}
+
+function extractJsDocMeta(node: ts.Node, sourceFile: ts.SourceFile): JsDocMeta {
   const fullText = sourceFile.getFullText();
   const ranges = ts.getLeadingCommentRanges(fullText, node.getFullStart());
-  if (!ranges || ranges.length === 0) return undefined;
+  if (!ranges || ranges.length === 0) return {};
 
   for (const range of ranges) {
     const comment = fullText.substring(range.pos, range.end);
-    if (comment.startsWith('/**')) {
-      return comment
-        .replace(/^\/\*\*|\*\/$/g, '')
-        .split('\n')
-        .map((line) => line.replace(/^\s*\*\s?/, '').trim())
-        .filter(Boolean)
-        .join(' ');
+    if (!comment.startsWith('/**')) continue;
+
+    const lines = comment
+      .replace(/^\/\*\*|\*\/$/g, '')
+      .split('\n')
+      .map((line) => line.replace(/^\s*\*\s?/, '').trim())
+      .filter(Boolean);
+
+    const descLines: string[] = [];
+    const constraints: FieldConstraints = {};
+    let defaultValue: string | number | boolean | null | undefined;
+    let deprecated = false;
+
+    for (const line of lines) {
+      const tagMatch = line.match(/^@([a-zA-Z]+)(?:\s+(.*))?$/);
+      if (!tagMatch) {
+        descLines.push(line);
+        continue;
+      }
+
+      const tag = tagMatch[1].toLowerCase();
+      const val = (tagMatch[2] || '').trim();
+
+      switch (tag) {
+        case 'format':
+          if (val) constraints.format = val;
+          break;
+        case 'minimum':
+        case 'min':
+          if (!Number.isNaN(Number(val))) constraints.minimum = Number(val);
+          break;
+        case 'maximum':
+        case 'max':
+          if (!Number.isNaN(Number(val))) constraints.maximum = Number(val);
+          break;
+        case 'minlength':
+          if (!Number.isNaN(Number(val))) constraints.minLength = Number(val);
+          break;
+        case 'maxlength':
+          if (!Number.isNaN(Number(val))) constraints.maxLength = Number(val);
+          break;
+        case 'pattern':
+          if (val) constraints.pattern = val;
+          break;
+        case 'deprecated':
+          deprecated = true;
+          break;
+        case 'default':
+          if (val === 'true') defaultValue = true;
+          else if (val === 'false') defaultValue = false;
+          else if (val === 'null') defaultValue = null;
+          else if (val !== '' && !Number.isNaN(Number(val))) defaultValue = Number(val);
+          else defaultValue = val.replace(/^["']|["']$/g, '');
+          break;
+      }
     }
+
+    return {
+      ...(descLines.length > 0 ? { description: descLines.join(' ') } : {}),
+      ...(Object.keys(constraints).length > 0 ? { constraints } : {}),
+      ...(defaultValue !== undefined ? { defaultValue } : {}),
+      ...(deprecated ? { deprecated: true } : {}),
+    };
   }
-  return undefined;
+
+  return {};
 }

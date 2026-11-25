@@ -3,12 +3,16 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { parseTypeScriptFile } from '../parsers/typescript';
+import { parseJsonSchema } from '../parsers/json-schema';
 import { SchemaDocument } from '../ir/types';
 import { compile, SupportedTarget } from '../generators';
 import { loadConfig, TypeBridgeConfig } from '../config';
 import { getSchemaStats, diffSchemas } from '../analyzer';
 import { generateMockJson } from '../mock';
 import { startStudioServer } from '../server/studio';
+import { runDoctor } from './doctor';
+import { startMcpServer } from './mcp-server';
+import { startRepl } from './repl';
 
 const VERSION = '0.1.0';
 
@@ -28,13 +32,18 @@ Commands:
   stats              Display schema metrics and JSDoc documentation coverage
   mock [file] [type] Synthesize realistic mock JSON data from schema
   studio / serve     Launch local real-time web compiler studio
+  repl / chat        Launch interactive Claude-style TypeBridge shell
+  doctor             Check config, schema diagnostics, sync, and local toolchains
+  mcp-server         Start stdio Model Context Protocol (MCP) server for AI clients
   init               Scaffold starter configuration and models
 
 Options:
   -c, --config   Path to configuration file (defaults to typebridge.config.json)
   -i, --input    Source schema file path (e.g. models.ts)
-  -t, --target   Target: python, rust, go, typescript, json-schema, markdown, graphql, openapi, mcp
+  -t, --target   Target: python, rust, go, typescript, json-schema, markdown, graphql, openapi, mcp, kotlin, swift
   -o, --output   Destination output file path
+  --format       Output format: text (default) or json (for stats, diff, doctor, check)
+  --json         Shorthand for --format json
   --dry-run      Preview generated files without writing them
   -p, --port     Port for studio server (defaults to 3456)
   -n, --count    Number of mock data items to synthesize (defaults to 1)
@@ -63,6 +72,7 @@ interface ParsedArgs {
   count?: number;
   watch?: boolean;
   dryRun?: boolean;
+  format?: 'text' | 'json';
   help?: boolean;
   version?: boolean;
   positional: string[];
@@ -87,6 +97,10 @@ function parseArgs(args: string[]): ParsedArgs {
       result.watch = true;
     } else if (arg === '--dry-run') {
       result.dryRun = true;
+    } else if (arg === '--json') {
+      result.format = 'json';
+    } else if (arg === '--format') {
+      result.format = args[++i] === 'json' ? 'json' : 'text';
     } else if (arg === '-c' || arg === '--config') {
       result.config = args[++i];
     } else if (arg === '-i' || arg === '--input') {
@@ -133,6 +147,10 @@ function printLineDiff(filePath: string, current: string, generated: string): vo
   }
 }
 function parseAndReport(inputPath: string): SchemaDocument {
+  if (inputPath.toLowerCase().endsWith('.json')) {
+    const raw = fs.readFileSync(inputPath, 'utf-8');
+    return parseJsonSchema(raw, path.basename(inputPath));
+  }
   const doc = parseTypeScriptFile(inputPath);
   if (doc.diagnostics && doc.diagnostics.length > 0) {
     for (const d of doc.diagnostics) {
@@ -309,6 +327,36 @@ async function main() {
     return;
   }
 
+  // Command: repl / chat
+  if (command === 'repl' || command === 'chat') {
+    startRepl(args.input || args.positional[0]);
+    return;
+  }
+
+  // Command: mcp-server
+  if (command === 'mcp-server') {
+    startMcpServer();
+    return;
+  }
+
+  // Command: doctor
+  if (command === 'doctor') {
+    const report = runDoctor(process.cwd());
+    if (args.format === 'json') {
+      console.log(JSON.stringify(report, null, 2));
+    } else {
+      console.log('\nTypeBridge Doctor\n' + '─'.repeat(40));
+      for (const check of report.checks) {
+        const icon = check.status === 'pass' ? colorize('✓', 'green') : check.status === 'warn' ? colorize('!', 'yellow') : colorize('✗', 'red');
+        console.log(`  ${icon} ${check.name}: ${check.detail}`);
+        if (check.suggestion) console.log(colorize(`    → ${check.suggestion}`, 'cyan'));
+      }
+      console.log('');
+    }
+    if (!report.ok) process.exit(1);
+    return;
+  }
+
   // Command: diff <base> <new>
   if (command === 'diff') {
     const fileA = args.positional[0] || args.input;
@@ -355,6 +403,11 @@ async function main() {
     }
     const doc = parseAndReport(targetPath);
     const stats = getSchemaStats(doc);
+
+    if (args.format === 'json') {
+      console.log(JSON.stringify({ file: targetFile, ...stats, diagnostics: doc.diagnostics || [] }, null, 2));
+      return;
+    }
 
     console.log(`\n📊 Schema Analysis: ${targetFile}`);
     console.log('─'.repeat(40));

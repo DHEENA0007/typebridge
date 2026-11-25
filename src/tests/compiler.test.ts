@@ -307,4 +307,123 @@ export interface Broken {
     assert.ok(diag.message.includes('Unsupported TypeScript type'));
   });
 
+  test('CLI doctor --format json returns structured health report', () => {
+    const cli = path.resolve(__dirname, '../cli/index.js');
+    const result = spawnSync(process.execPath, [cli, 'doctor', '--format', 'json'], {
+      cwd: path.resolve(__dirname, '../..'),
+      encoding: 'utf8',
+    });
+    assert.strictEqual(result.status, 0, result.stderr);
+    const report = JSON.parse(result.stdout);
+    assert.strictEqual(report.ok, true);
+    assert.ok(Array.isArray(report.checks));
+    assert.ok(report.checks.some((c: any) => c.name === 'Configuration' && c.status === 'pass'));
+    assert.ok(report.checks.some((c: any) => c.name === 'Schema Sync' && c.status === 'pass'));
+  });
+
+  test('CLI stats --format json returns structured metrics and diagnostics', () => {
+    const cli = path.resolve(__dirname, '../cli/index.js');
+    const result = spawnSync(process.execPath, [cli, 'stats', '--format', 'json'], {
+      cwd: path.resolve(__dirname, '../..'),
+      encoding: 'utf8',
+    });
+    assert.strictEqual(result.status, 0, result.stderr);
+    const stats = JSON.parse(result.stdout);
+    assert.ok(stats.modelsCount > 0);
+    assert.ok(Array.isArray(stats.diagnostics));
+  });
+
+  test('MCP server handles initialize, tools/list, and tools/call', async () => {
+    const { handleMcpMessage } = await import('../cli/mcp-server');
+
+    const initRes = handleMcpMessage({ jsonrpc: '2.0', id: 1, method: 'initialize' });
+    assert.ok(initRes && initRes.result.serverInfo.name === 'typebridge');
+
+    const listRes = handleMcpMessage({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
+    assert.ok(listRes && Array.isArray(listRes.result.tools));
+    assert.ok(listRes.result.tools.some((t: any) => t.name === 'compile_schema'));
+
+    const callRes = handleMcpMessage({
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'tools/call',
+      params: { name: 'check_drift', arguments: { cwd: path.resolve(__dirname, '../..') } },
+    });
+    assert.ok(callRes && callRes.result.content[0].type === 'text');
+    const payload = JSON.parse(callRes.result.content[0].text);
+    assert.strictEqual(payload.ok, true);
+  });
+
+  test('extracts JSDoc validation constraints and emits them to JSON Schema, Zod, and Pydantic', () => {
+    const doc = parseTypeScript(`
+      export interface SignupInput {
+        /**
+         * User email address
+         * @format email
+         * @maxLength 120
+         */
+        email: string;
+        /**
+         * User age
+         * @minimum 18
+         * @maximum 120
+         * @default 21
+         */
+        age?: number;
+        /** @deprecated */
+        legacyCode?: string;
+      }
+    `, 'signup.ts');
+
+    const jsonSchema = JSON.parse(compile(doc, 'json-schema'));
+    assert.strictEqual(jsonSchema.properties.email.format, 'email');
+    assert.strictEqual(jsonSchema.properties.email.maxLength, 120);
+    assert.strictEqual(jsonSchema.properties.age.minimum, 18);
+    assert.strictEqual(jsonSchema.properties.age.maximum, 120);
+    assert.strictEqual(jsonSchema.properties.age.default, 21);
+    assert.strictEqual(jsonSchema.properties.legacyCode.deprecated, true);
+
+    const tsZod = compile(doc, 'typescript', { typescript: { includeZod: true } });
+    assert.ok(tsZod.includes('.email()'));
+    assert.ok(tsZod.includes('.max(120)'));
+    assert.ok(tsZod.includes('.min(18)'));
+    assert.ok(tsZod.includes('.default(21)'));
+
+    const py = compile(doc, 'python');
+    assert.ok(py.includes('max_length=120'));
+    assert.ok(py.includes('ge=18'));
+    assert.ok(py.includes('le=120'));
+    assert.ok(py.includes('default=21'));
+  });
+
+  test('reverse-parses JSON Schema into IR and compiles to Kotlin and Swift', async () => {
+    const { parseJsonSchema } = await import('../parsers/json-schema');
+    const jsonSchema = JSON.stringify({
+      title: 'Product',
+      type: 'object',
+      required: ['id', 'price'],
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        price: { type: 'number', minimum: 0 },
+        tags: { type: 'array', items: { type: 'string' } },
+      },
+    });
+
+    const doc = parseJsonSchema(jsonSchema, 'product.json');
+    assert.strictEqual(doc.definitions.length, 1);
+
+    const kt = compile(doc, 'kotlin');
+    assert.ok(kt.includes('@Serializable'));
+    assert.ok(kt.includes('data class Product('));
+    assert.ok(kt.includes('val id: String,'));
+    assert.ok(kt.includes('val price: Double,'));
+    assert.ok(kt.includes('val tags: List<String>? = null'));
+
+    const swift = compile(doc, 'swift');
+    assert.ok(swift.includes('public struct Product: Codable, Sendable {'));
+    assert.ok(swift.includes('public let id: UUID'));
+    assert.ok(swift.includes('public let price: Double'));
+    assert.ok(swift.includes('public let tags: [String]?'));
+  });
+
 });

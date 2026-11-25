@@ -7,6 +7,8 @@ import { generateJsonSchema, JsonSchemaOptions } from './json-schema';
 import { generateMarkdown, MarkdownGeneratorOptions } from './markdown';
 import { generateGraphQL, GraphQLGeneratorOptions } from './graphql';
 import { generateOpenAPI, generateMCPTools, OpenAPIGeneratorOptions } from './openapi';
+import { generateKotlin, KotlinGeneratorOptions } from './kotlin';
+import { generateSwift } from './swift';
 
 export * from './python';
 export * from './rust';
@@ -16,6 +18,8 @@ export * from './json-schema';
 export * from './markdown';
 export * from './graphql';
 export * from './openapi';
+export * from './kotlin';
+export * from './swift';
 
 export type SupportedTarget =
   | 'python'
@@ -35,7 +39,10 @@ export type SupportedTarget =
   | 'gql'
   | 'openapi'
   | 'oas'
-  | 'mcp';
+  | 'mcp'
+  | 'kotlin'
+  | 'kt'
+  | 'swift';
 
 export interface GenerateOptions {
   python?: PythonGeneratorOptions;
@@ -45,6 +52,7 @@ export interface GenerateOptions {
   markdown?: MarkdownGeneratorOptions;
   graphql?: GraphQLGeneratorOptions;
   openapi?: OpenAPIGeneratorOptions;
+  kotlin?: KotlinGeneratorOptions;
 }
 
 /**
@@ -83,9 +91,14 @@ export function compile(
       return generateOpenAPI(doc, { ...options.openapi, mode: 'openapi' });
     case 'mcp':
       return generateMCPTools(doc);
+    case 'kotlin':
+    case 'kt':
+      return generateKotlin(doc, options.kotlin);
+    case 'swift':
+      return generateSwift(doc);
     default:
       throw new Error(
-        `Unsupported target: '${target}'. Supported targets: python, rust, go, typescript, json-schema, markdown, graphql, openapi, mcp.`
+        `Unsupported target: '${target}'. Supported targets: python, rust, go, typescript, json-schema, markdown, graphql, openapi, mcp, kotlin, swift.`
       );
   }
 }

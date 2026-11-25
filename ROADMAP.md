@@ -2,50 +2,44 @@
 
 ## What it is
 
-TypeBridge is a cross-language schema compiler (~1.5k lines of TypeScript):
+TypeBridge is a cross-language schema compiler:
 
 ```
-TypeScript source ─► parser (TS compiler API) ─► IR (SchemaDocument) ─► generators ─► Python / Rust / Go / TS(Zod) / JSON Schema
+TypeScript / JSON Schema ─► parser ─► IR (SchemaDocument) ─► generators ─► Python / Rust / Go / Kotlin / Swift / TS(Zod) / GraphQL / OpenAPI / MCP / JSON Schema / Markdown
 ```
 
-- IR (`src/ir/types.ts`): structs, enums, aliases, unions; type nodes for primitive, reference, array, map, optional, union, literal.
-- CLI: `generate`, `check` (CI drift gate), `watch`, config-file batch mode, plus a GitHub Action.
+- IR (`src/ir/types.ts`): structs, enums, aliases, unions; type nodes for primitive, reference, array, map, optional, union, literal; field constraints and parser diagnostics.
+- CLI (`src/cli/index.ts`): `generate`, `check` (CI drift gate), `watch`, `diff`, `stats`, `mock`, `doctor`, `repl` / `chat`, `mcp-server`, `studio`, plus a GitHub Action.
 - Adding a language means adding one file under `src/generators/`.
 
-## Gaps and improvements
+## Status & Roadmap
 
 ### Correctness / robustness
-- **Test coverage is thin**: one 100-line test file run via plain `node`. Move to `node:test` or Vitest. Add golden-file snapshot tests per generator, using `examples/generated/`.
-- **IR is limited**: no generics, intersections (`A & B`), `extends` inheritance, tuples, `Record` variants, `readonly`, discriminated unions or constraints (min/max/pattern/format).
-- **Parser errors**: report file, line and column diagnostics instead of silently skipping unsupported syntax.
-- **Cross-file imports**: support multi-file schemas and `import`/`export from` resolution.
-- **Name handling**: reserved-keyword escaping per target language, and configurable naming conventions.
+- [x] **Test suite on `node:test`**: Unit & CLI integration tests in `src/tests/compiler.test.ts`.
+- [x] **Inheritance & intersections**: `interface extends` and `A & B` intersections resolved in `src/parsers/typescript.ts`.
+- [x] **Parser diagnostics**: File, line, and column diagnostics (`ParserDiagnostic`) for unsupported syntax and broken imports.
+- [x] **Cross-file imports**: Multi-file `import` and `export ... from` resolution via `parseTypeScriptFile`.
+- [ ] **Remaining TS constructs**: Generics, tuples (`[A, B]`), `readonly`, and discriminated unions.
+- [ ] **Name handling**: Reserved-keyword escaping per target language and configurable naming conventions.
 
 ### Features
-- **JSDoc annotations** such as `@format email`, `@minimum 0`, `@default`, `@deprecated`, mapped to Pydantic `Field(...)`, Zod refinements and JSON Schema keywords.
-- **More inputs**: JSON Schema and OpenAPI to IR (reverse direction), then Protobuf and GraphQL.
-- **More targets**: Kotlin, Swift, C#, Java, Zod-only, Valibot, OpenAPI and Protobuf output.
-- **Round-trip validation**: in CI, compile the generated Python, Rust and Go (`pyright`, `cargo check`, `go vet`) to prove the output is valid.
-- **Formatting**: run output through the native formatter (`ruff`, `rustfmt`, `gofmt`) when available.
+- [x] **JSDoc annotations**: `@format`, `@minimum`/`@min`, `@maximum`/`@max`, `@minLength`, `@maxLength`, `@pattern`, `@default`, `@deprecated` mapped to JSON Schema, Zod, and Pydantic `Field(...)`.
+- [x] **JSON Schema reverse parser**: `parseJsonSchema` (`src/parsers/json-schema.ts`) + `.json` auto-detection in CLI.
+- [ ] **More reverse inputs**: OpenAPI 3.1, GraphQL SDL, and Protobuf to IR.
+- [x] **Kotlin & Swift targets**: `kotlinx.serialization` (`src/generators/kotlin.ts`) and Swift `Codable` (`src/generators/swift.ts`).
+- [ ] **More targets**: C#, Java, Protobuf, Valibot, SQL DDL.
+- [x] **Round-trip validation**: CI `roundtrip-check` validates `typebridge check`, `python3 -m py_compile`, and `go vet`.
+- [ ] **Formatting**: Run output through `ruff`, `rustfmt`, `gofmt` when available.
 
 ### Developer experience
-- Ship **ESLint and Prettier** configs, and a `lint` script that does more than `tsc --noEmit`.
-- Publish to npm with **provenance** and automated releases (changesets or release-please).
-- Add a **VS Code extension / LSP** for live preview of generated output.
-- Make the playground bundle the real compiler (esbuild to a browser build) so it never diverges from the CLI.
-- Add a `--format json` diagnostics output for tooling integration.
+- [x] **npm release with provenance**: `.github/workflows/release.yml`.
+- [x] **Structured `--format json` output**: Supported on `doctor` and `stats`.
+- [x] **Interactive REPL & MCP server**: `typebridge repl` (`src/cli/repl.ts`) and `typebridge mcp-server` (`src/cli/mcp-server.ts`).
+- [ ] **ESLint and Prettier** configs in `npm run lint`.
+- [ ] **VS Code extension / LSP** for live preview of generated output.
+- [ ] **Bundled browser playground**: Bundle the real compiler into `examples/playground.html` so it never diverges from the CLI.
 
 ### Advanced direction
-- **Schema evolution checks**: `typebridge diff old new` that flags breaking changes (removed fields, type narrowing) for API compatibility.
-- **Plugin API** so third parties can register generators without forking.
-- **Runtime validators and serializers** (opt-in) for targets without them.
-- **MCP / AI tooling**: emit tool definitions for LLM function calling (OpenAI, Anthropic, Gemini) from the same types.
-
-## Suggested order
-
-1. Test harness and golden snapshots
-2. Parser diagnostics and the missing TS constructs (`extends`, intersections, tuples, generics)
-3. JSDoc constraints
-4. Compile-the-output CI checks
-5. New targets / reverse inputs
-6. Plugin API and `diff` command
+- [x] **Schema evolution checks**: `typebridge diff <base> <new>`.
+- [x] **MCP / AI tooling**: `typebridge -t mcp` tool schemas and live `typebridge mcp-server`.
+- [ ] **Plugin API** so third parties can register generators without forking.

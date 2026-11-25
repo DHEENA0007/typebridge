@@ -43,10 +43,25 @@ function generateDefinitionSchema(def: TypeDefinition): Record<string, any> {
     const properties: Record<string, any> = {};
 
     for (const field of def.fields) {
-      properties[field.name] = mapTypeToJsonSchema(field.type);
+      const prop = mapTypeToJsonSchema(field.type);
       if (field.description) {
-        properties[field.name].description = field.description;
+        prop.description = field.description;
       }
+      if (field.constraints) {
+        if (field.constraints.format !== undefined) prop.format = field.constraints.format;
+        if (field.constraints.minimum !== undefined) prop.minimum = field.constraints.minimum;
+        if (field.constraints.maximum !== undefined) prop.maximum = field.constraints.maximum;
+        if (field.constraints.minLength !== undefined) prop.minLength = field.constraints.minLength;
+        if (field.constraints.maxLength !== undefined) prop.maxLength = field.constraints.maxLength;
+        if (field.constraints.pattern !== undefined) prop.pattern = field.constraints.pattern;
+      }
+      if (field.defaultValue !== undefined) {
+        prop.default = field.defaultValue;
+      }
+      if (field.deprecated) {
+        prop.deprecated = true;
+      }
+      properties[field.name] = prop;
       if (!field.optional) {
         required.push(field.name);
       }

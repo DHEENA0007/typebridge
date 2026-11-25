@@ -69,6 +69,19 @@ function generateZodSchema(def: Extract<TypeDefinition, { kind: 'struct' }>): st
 
   for (const field of def.fields) {
     let zodType = mapTypeToZod(field.type);
+    if (field.constraints) {
+      if (field.constraints.format === 'email') zodType += '.email()';
+      else if (field.constraints.format === 'uuid') zodType += '.uuid()';
+      else if (field.constraints.format === 'uri' || field.constraints.format === 'url') zodType += '.url()';
+      if (field.constraints.minLength !== undefined) zodType += `.min(${field.constraints.minLength})`;
+      if (field.constraints.maxLength !== undefined) zodType += `.max(${field.constraints.maxLength})`;
+      if (field.constraints.minimum !== undefined) zodType += `.min(${field.constraints.minimum})`;
+      if (field.constraints.maximum !== undefined) zodType += `.max(${field.constraints.maximum})`;
+      if (field.constraints.pattern !== undefined) zodType += `.regex(new RegExp(${JSON.stringify(field.constraints.pattern)}))`;
+    }
+    if (field.defaultValue !== undefined) {
+      zodType = `${zodType}.default(${JSON.stringify(field.defaultValue)})`;
+    }
     if (field.optional) {
       zodType = `${zodType}.optional()`;
     }
