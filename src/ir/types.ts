@@ -64,9 +64,18 @@ export type TypeDefinition =
       variants: TypeNode[];
     };
 
+export interface ParserDiagnostic {
+  severity: 'warning' | 'error';
+  message: string;
+  file: string;
+  line: number;
+  column: number;
+}
+
 export interface SchemaDocument {
   title?: string;
   version?: string;
   description?: string;
   definitions: TypeDefinition[];
+  diagnostics?: ParserDiagnostic[];
 }

@@ -40,3 +40,43 @@ jobs:
 
       - name: Run Tests
         run: npm test
+
+  roundtrip-check:
+    name: Generated Output & Drift Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+          cache: 'npm'
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install & Build
+        run: npm ci && npm run build
+
+      - name: Verify Example Schema Sync (Drift Gate)
+        run: node dist/cli/index.js check
+
+      - name: Validate Generated Python Syntax
+        run: python3 -m py_compile examples/generated/models.py
+
+      - name: Validate Generated Go Package
+        run: |
+          mkdir -p /tmp/go-check
+          cp examples/generated/models.go /tmp/go-check/models.go
+          cd /tmp/go-check
+          go mod init typebridge_check
+          go vet ./...

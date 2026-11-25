@@ -1,36 +1,43 @@
-name: 🐛 Bug Report
-description: Create a report to help us improve TypeBridge
-labels: ["bug"]
+name: Bug Report
+description: Report a parser, generator, or CLI bug in TypeBridge
+title: "[Bug]: "
+labels: ["bug", "triage"]
 body:
-  - type: markdown
+  - type: textarea
+    id: description
     attributes:
-      value: |
-        Thanks for taking the time to report a bug! Please fill out the information below.
-  - type: input
-    id: version
-    attributes:
-      label: TypeBridge Version
-      description: What version of TypeBridge are you running? (Run `typebridge --version`)
-      placeholder: e.g., 0.1.0
+      label: Describe the bug
+      description: A clear and concise description of what happened.
     validations:
       required: true
   - type: textarea
     id: schema
     attributes:
-      label: Minimal Input Schema
-      description: Provide the minimal input TypeScript or JSON Schema that triggers the issue.
+      label: Minimal Schema Reproduction
+      description: Paste the TypeScript schema that triggered the issue.
       render: typescript
+    validations:
+      required: true
+  - type: dropdown
+    id: target
+    attributes:
+      label: Target Language / Format
+      options:
+        - Python (Pydantic / dataclass)
+        - Rust (Serde)
+        - Go
+        - TypeScript / Zod
+        - JSON Schema
+        - GraphQL
+        - OpenAPI
+        - MCP
+        - Markdown
+        - CLI / Parser
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: Expected vs Actual Generated Output
-      description: What code should have been generated, and what was actually output?
+      label: Expected vs Actual Output
     validations:
       required: true
-  - type: textarea
-    id: context
-    attributes:
-      label: Additional Context
-      description: Any other context (OS, Node version, target language version).

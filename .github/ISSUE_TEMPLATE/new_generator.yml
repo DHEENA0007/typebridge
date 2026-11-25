@@ -1,30 +1,27 @@
-name: 🌐 New Language or Framework Generator Proposal
-description: Propose or claim building a new generator for TypeBridge
-labels: ["enhancement", "generator", "help-wanted", "good-first-issue"]
+name: New Language / Format Generator
+description: Propose or claim a new target generator (great for first-time contributors!)
+title: "[Generator]: "
+labels: ["good first issue", "generator"]
 body:
   - type: markdown
     attributes:
       value: |
-        Awesome! Adding a new generator to TypeBridge is self-contained and modular.
+        Adding a new generator to TypeBridge is self-contained:
+        1. Read `src/ir/types.ts` to see the universal AST (`SchemaDocument`, `TypeDefinition`, `TypeNode`).
+        2. Use an existing generator like `src/generators/go.ts` or `src/generators/rust.ts` as a reference.
+        3. Register the new target in `src/generators/index.ts`.
+        4. Add unit tests in `src/tests/compiler.test.ts`.
   - type: input
-    id: target_language
+    id: language
     attributes:
-      label: Target Language or Framework
-      description: Which language or framework do you want to generate code for?
-      placeholder: e.g., Swift, Kotlin, C#, Dart, Prisma, GraphQL
+      label: Target Language or Format
+      placeholder: e.g., Kotlin, Swift, C#, Protobuf, Valibot
     validations:
       required: true
   - type: textarea
-    id: sample_output
+    id: libraries
     attributes:
-      label: Sample Expected Output
-      description: Provide an example of what the generated code should look like for a simple User struct.
-      render: markdown
+      label: Target Idioms / Libraries
+      placeholder: e.g., kotlinx.serialization data classes, Swift Codable structs
     validations:
       required: true
-  - type: checkboxes
-    id: will_implement
-    attributes:
-      label: Implementation
-      options:
-        - label: I would like to implement this generator myself! (We will assign it to you)

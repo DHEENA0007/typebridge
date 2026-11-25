@@ -2,7 +2,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { parseTypeScript } from '../parsers/typescript';
+import { parseTypeScriptFile } from '../parsers/typescript';
+import { SchemaDocument } from '../ir/types';
 import { compile, SupportedTarget } from '../generators';
 import { loadConfig, TypeBridgeConfig } from '../config';
 import { getSchemaStats, diffSchemas } from '../analyzer';
@@ -107,10 +108,10 @@ function parseArgs(args: string[]): ParsedArgs {
 }
 
 
-function colorize(text: string, color: 'red' | 'green' | 'cyan'): string {
+function colorize(text: string, color: 'red' | 'green' | 'cyan' | 'yellow'): string {
   const enabled = !process.env.NO_COLOR && process.env.FORCE_COLOR !== '0' && (process.stdout.isTTY || process.env.FORCE_COLOR === '1');
   if (!enabled) return text;
-  const codes = { red: '\u001b[31m', green: '\u001b[32m', cyan: '\u001b[36m' };
+  const codes = { red: '\u001b[31m', green: '\u001b[32m', cyan: '\u001b[36m', yellow: '\u001b[33m' };
   return codes[color] + text + '\u001b[0m';
 }
 function printLineDiff(filePath: string, current: string, generated: string): void {
@@ -131,9 +132,19 @@ function printLineDiff(filePath: string, current: string, generated: string): vo
     else { console.log(colorize('-' + oldLines[i], 'red')); i++; }
   }
 }
+function parseAndReport(inputPath: string): SchemaDocument {
+  const doc = parseTypeScriptFile(inputPath);
+  if (doc.diagnostics && doc.diagnostics.length > 0) {
+    for (const d of doc.diagnostics) {
+      const label = d.severity === 'error' ? 'error' : 'warning';
+      console.error(colorize(`${d.file}:${d.line}:${d.column} - ${label}: ${d.message}`, d.severity === 'error' ? 'red' : 'yellow'));
+    }
+  }
+  return doc;
+}
+
 function compileSingle(inputPath: string, target: SupportedTarget, options: Record<string, any> = {}): string {
-  const sourceCode = fs.readFileSync(inputPath, 'utf-8');
-  const doc = parseTypeScript(sourceCode, path.basename(inputPath));
+  const doc = parseAndReport(inputPath);
   return compile(doc, target, options as any);
 }
 
@@ -144,8 +155,7 @@ function executeBatchGenerate(config: TypeBridgeConfig, baseDir: string, dryRun 
     throw new Error(`Input file not found: ${inputPath}`);
   }
 
-  const sourceCode = fs.readFileSync(inputPath, 'utf-8');
-  const doc = parseTypeScript(sourceCode, path.basename(inputPath));
+  const doc = parseAndReport(inputPath);
 
   for (const item of config.targets) {
     const outputPath = path.resolve(baseDir, item.output);
@@ -176,8 +186,7 @@ function executeBatchCheck(config: TypeBridgeConfig, baseDir: string): boolean {
     return false;
   }
 
-  const sourceCode = fs.readFileSync(inputPath, 'utf-8');
-  const doc = parseTypeScript(sourceCode, path.basename(inputPath));
+  const doc = parseAndReport(inputPath);
   let hasDrift = false;
 
   for (const item of config.targets) {
@@ -314,8 +323,8 @@ async function main() {
       console.error('Error: One or both schema files do not exist.');
       process.exit(1);
     }
-    const docA = parseTypeScript(fs.readFileSync(pathA, 'utf-8'), path.basename(pathA));
-    const docB = parseTypeScript(fs.readFileSync(pathB, 'utf-8'), path.basename(pathB));
+    const docA = parseAndReport(pathA);
+    const docB = parseAndReport(pathB);
     const result = diffSchemas(docA, docB);
 
     console.log(`\nTypeBridge Schema Diff: ${fileA} ➔ ${fileB}\n`);
@@ -344,7 +353,7 @@ async function main() {
       console.error(`Error: Schema file not found: ${targetPath}`);
       process.exit(1);
     }
-    const doc = parseTypeScript(fs.readFileSync(targetPath, 'utf-8'), path.basename(targetPath));
+    const doc = parseAndReport(targetPath);
     const stats = getSchemaStats(doc);
 
     console.log(`\n📊 Schema Analysis: ${targetFile}`);
@@ -370,10 +379,7 @@ async function main() {
       console.error(`Error: Schema file not found: ${targetPath}`);
       process.exit(1);
     }
-    const doc = parseTypeScript(
-      fs.readFileSync(targetPath, 'utf-8'),
-      path.basename(targetPath)
-    );
+    const doc = parseAndReport(targetPath);
     const typeName = args.positional[1];
     const count = args.count || 1;
     const jsonOutput = generateMockJson(doc, typeName, { count });

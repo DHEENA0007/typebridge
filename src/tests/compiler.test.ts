@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { parseTypeScript } from '../parsers/typescript';
+import { parseTypeScript, parseTypeScriptFile } from '../parsers/typescript';
 import { compile } from '../generators';
 
 const sampleTs = `
@@ -220,6 +220,91 @@ describe('TypeBridge Compiler Suite', () => {
       assert.ok(result.stdout.includes('\u001b[31m-'));
       assert.ok(result.stdout.includes('\u001b[32m+'));
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test('resolves interface extends and field overrides (including forward references)', () => {
+    const doc = parseTypeScript(`
+      export interface AdminUser extends BaseEntity, Auditable {
+        role: string;
+        id: number; // overrides string from BaseEntity
+      }
+      export interface BaseEntity {
+        id: string;
+      }
+      export interface Auditable {
+        createdAt: Date;
+      }
+    `, 'extends.ts');
+
+    const admin = doc.definitions.find((d) => d.name === 'AdminUser');
+    assert.ok(admin && admin.kind === 'struct');
+    assert.deepStrictEqual(
+      admin.fields.map((f) => f.name),
+      ['id', 'createdAt', 'role']
+    );
+    const idField = admin.fields.find((f) => f.name === 'id');
+    assert.deepStrictEqual(idField?.type, { kind: 'primitive', primitive: 'number' });
+  });
+
+  test('resolves intersection type aliases into merged structs', () => {
+    const doc = parseTypeScript(`
+      export interface Timestamped {
+        createdAt: Date;
+      }
+      export type Order = Timestamped & {
+        orderId: string;
+        total: number;
+      };
+    `, 'intersection.ts');
+
+    const order = doc.definitions.find((d) => d.name === 'Order');
+    assert.ok(order && order.kind === 'struct');
+    assert.deepStrictEqual(
+      order.fields.map((f) => f.name),
+      ['createdAt', 'orderId', 'total']
+    );
+  });
+
+  test('resolves multi-file imports and circular references via parseTypeScriptFile', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'typebridge-multifile-'));
+    try {
+      fs.writeFileSync(
+        path.join(dir, 'shared.ts'),
+        `export type Role = 'ADMIN' | 'USER';\nexport interface Base { id: string; }\n`
+      );
+      fs.writeFileSync(
+        path.join(dir, 'index.ts'),
+        `import { Base, Role } from './shared';\nexport interface Account extends Base { role: Role; }\n`
+      );
+
+      const doc = parseTypeScriptFile(path.join(dir, 'index.ts'));
+      assert.strictEqual(doc.diagnostics, undefined);
+      assert.ok(doc.definitions.some((d) => d.name === 'Role'));
+      assert.ok(doc.definitions.some((d) => d.name === 'Base'));
+      const account = doc.definitions.find((d) => d.name === 'Account');
+      assert.ok(account && account.kind === 'struct');
+      assert.deepStrictEqual(
+        account.fields.map((f) => f.name),
+        ['id', 'role']
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('reports parser diagnostics with file, line, and column for unsupported syntax', () => {
+    const doc = parseTypeScript(`
+export interface Broken {
+  callback: (x: string) => void;
+}
+    `.trim(), 'broken.ts');
+
+    assert.ok(doc.diagnostics && doc.diagnostics.length > 0);
+    const diag = doc.diagnostics[0];
+    assert.strictEqual(diag.file, 'broken.ts');
+    assert.strictEqual(diag.line, 2);
+    assert.ok(diag.column > 1);
+    assert.ok(diag.message.includes('Unsupported TypeScript type'));
   });
 
 });
